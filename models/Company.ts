@@ -1,16 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export interface IReview {
-  user: mongoose.Types.ObjectId;
-  rating: number;
-  title: string;
-  comment: string;
-  pros?: string;
-  cons?: string;
-  isVerified: boolean;
-  createdAt: Date;
-}
-
 export interface ICompany extends Document {
   name: string;
   slug: string;
@@ -21,17 +10,17 @@ export interface ICompany extends Document {
   shortDescription?: string;
   industry: string;
   size: string;
-  founded?: Date;
-  headquarters: string;
-  locations: string[];
-  specialties: string[];
-  culture: {
+  foundedYear?: number;
+  location: string;
+  locations?: string[];
+  specialties?: string[];
+  benefits?: string[];
+  culture?: {
     values?: string[];
-    benefits?: string[];
     workLifeBalance?: string;
     workEnvironment?: string;
   };
-  socialProfiles: {
+  socialProfiles?: {
     linkedin?: string;
     twitter?: string;
     facebook?: string;
@@ -44,10 +33,16 @@ export interface ICompany extends Document {
   }[];
   photos?: string[];
   videos?: string[];
-  reviews: IReview[];
   rating: {
     average: number;
     count: number;
+    distribution?: {
+      '1': number;
+      '2': number;
+      '3': number;
+      '4': number;
+      '5': number;
+    };
   };
   followers: mongoose.Types.ObjectId[];
   owner: mongoose.Types.ObjectId;
@@ -105,12 +100,12 @@ const CompanySchema = new Schema<ICompany>(
         '10000+',
       ],
     },
-    founded: {
-      type: Date,
+    foundedYear: {
+      type: Number,
     },
-    headquarters: {
+    location: {
       type: String,
-      required: [true, 'Please add headquarters location'],
+      required: [true, 'Please add a primary location'],
     },
     locations: [
       {
@@ -122,13 +117,13 @@ const CompanySchema = new Schema<ICompany>(
         type: String,
       },
     ],
+    benefits: [
+      {
+        type: String,
+      },
+    ],
     culture: {
       values: [
-        {
-          type: String,
-        },
-      ],
-      benefits: [
         {
           type: String,
         },
@@ -179,43 +174,6 @@ const CompanySchema = new Schema<ICompany>(
         type: String,
       },
     ],
-    reviews: [
-      {
-        user: {
-          type: Schema.Types.ObjectId,
-          ref: 'User',
-          required: true,
-        },
-        rating: {
-          type: Number,
-          required: true,
-          min: 1,
-          max: 5,
-        },
-        title: {
-          type: String,
-          required: true,
-        },
-        comment: {
-          type: String,
-          required: true,
-        },
-        pros: {
-          type: String,
-        },
-        cons: {
-          type: String,
-        },
-        isVerified: {
-          type: Boolean,
-          default: false,
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
     rating: {
       average: {
         type: Number,
@@ -224,6 +182,28 @@ const CompanySchema = new Schema<ICompany>(
       count: {
         type: Number,
         default: 0,
+      },
+      distribution: {
+        '1': {
+          type: Number,
+          default: 0,
+        },
+        '2': {
+          type: Number,
+          default: 0,
+        },
+        '3': {
+          type: Number,
+          default: 0,
+        },
+        '4': {
+          type: Number,
+          default: 0,
+        },
+        '5': {
+          type: Number,
+          default: 0,
+        },
       },
     },
     followers: [
@@ -282,5 +262,51 @@ CompanySchema.virtual('jobs', {
   foreignField: 'company',
   justOne: false,
 });
+
+// Virtual for reviews
+CompanySchema.virtual('reviews', {
+  ref: 'Review',
+  localField: '_id',
+  foreignField: 'company',
+  justOne: false,
+  options: { sort: { createdAt: -1 } },
+});
+
+// Method to update rating based on reviews
+CompanySchema.methods.updateRating = async function () {
+  const Review = mongoose.model('Review');
+  
+  const stats = await Review.aggregate([
+    { $match: { company: this._id, status: 'approved' } },
+    { 
+      $group: { 
+        _id: null, 
+        average: { $avg: '$rating' },
+        count: { $sum: 1 },
+        distribution: {
+          $push: '$rating'
+        }
+      } 
+    }
+  ]);
+  
+  if (stats.length > 0) {
+    // Calculate distribution
+    const distribution = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    stats[0].distribution.forEach((rating: number) => {
+      distribution[rating.toString() as keyof typeof distribution]++;
+    });
+    
+    this.rating = {
+      average: stats[0].average,
+      count: stats[0].count,
+      distribution
+    };
+    
+    await this.save();
+  }
+  
+  return this.rating;
+};
 
 export default mongoose.models.Company || mongoose.model<ICompany>('Company', CompanySchema);
