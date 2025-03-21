@@ -54,6 +54,15 @@ A comprehensive job portal system with advanced features for job seekers, employ
 - **File Storage**: AWS S3
 - **Deployment**: Vercel
 
+## Images
+![image](https://github.com/user-attachments/assets/ff5434f2-5e91-4e69-bbc9-c2f639605276)
+![image](https://github.com/user-attachments/assets/fb383f03-f76f-424b-acf7-42c6e5af217e)
+![image](https://github.com/user-attachments/assets/7055b2d7-5fed-4276-835d-31c94b8e58a2)
+(cant put a image of each feature)
+
+
+
+
 ## Installation
 
 1. Clone the repository:
